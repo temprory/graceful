@@ -121,17 +121,17 @@ func (svr *HttpServer) Shutdown() error {
 	err := svr.listener.Close()
 	//time.Sleep(time.Second / 10)
 	logDebug("http server(\"%s\") shutdown waitting...", svr.addr)
-	if wrapper, ok := svr.server.Handler.(*HttpHandlerWrapper); ok {
-		wrapper.over = true
-		wrapper.Done()
-		time.AfterFunc(svr.timeout, func() {
-			logError("http server(\"%s\") shutdown timeout(%v)", svr.addr, svr.timeout)
-			if svr.onTimeout != nil {
-				svr.onTimeout()
-			}
-		})
-		wrapper.Wait()
-	}
+	wrapper := svr.server.Handler.(*HttpHandlerWrapper)
+	wrapper.over = true
+	wrapper.Done()
+	timer := time.AfterFunc(svr.timeout, func() {
+		logError("http server(\"%s\") shutdown timeout(%v)", svr.addr, svr.timeout)
+		if svr.onTimeout != nil {
+			svr.onTimeout()
+		}
+	})
+	defer timer.Stop()
+	wrapper.Wait()
 	logDebug("http server(\"%s\") shutdown done.", svr.addr)
 	//time.Sleep(time.Second / 10)
 	return err
@@ -183,8 +183,10 @@ func NewHttpServer(addr string, handler http.Handler, to time.Duration, opt *Soc
 	return svr, nil
 }
 
-func Serve(addr string, handler http.Handler, timeout time.Duration, opt *SocketOpt, onTimeout func()) {
-	svr, err := NewHttpServer(addr, handler, timeout, opt, onTimeout)
+func Serve(addr string, handler http.Handler, timeout time.Duration, opt *SocketOpt) {
+	svr, err := NewHttpServer(addr, handler, timeout, opt, func() {
+		os.Exit(0)
+	})
 	if err != nil {
 		logFatal("graceful: Serve failed: %v", err)
 	} else {
@@ -199,8 +201,10 @@ func Serve(addr string, handler http.Handler, timeout time.Duration, opt *Socket
 	})
 }
 
-func ServeTLS(addr string, handler http.Handler, timeout time.Duration, opt *SocketOpt, certFile string, keyFile string, onTimeout func()) {
-	svr, err := NewHttpServer(addr, handler, timeout, opt, onTimeout)
+func ServeTLS(addr string, handler http.Handler, timeout time.Duration, opt *SocketOpt, certFile string, keyFile string) {
+	svr, err := NewHttpServer(addr, handler, timeout, opt, func() {
+		os.Exit(0)
+	})
 	if err != nil {
 		logFatal("graceful: ServeTLS failed: %v", err)
 	} else {
