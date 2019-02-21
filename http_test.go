@@ -46,7 +46,5 @@ func TestHttpServer(t *testing.T) {
 	})
 
 	addr := ":8080"
-	Serve(addr, tollbooth.LimitFuncHandler(tollbooth.NewLimiter(100, nil), router.ServeHTTP), time.Second*5, nil, func() {
-		os.Exit(0)
-	})
+	Serve(addr, tollbooth.LimitFuncHandler(tollbooth.NewLimiter(100, nil), router.ServeHTTP), time.Second*5, nil)
 }
