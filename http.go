@@ -188,7 +188,7 @@ func Serve(addr string, handler http.Handler, timeout time.Duration, opt *Socket
 		os.Exit(0)
 	})
 	if err != nil {
-		logPanic("graceful: Serve failed: %v", err)
+		logFatal("graceful: Serve failed: %v", err)
 	} else {
 		safeGo(svr.Serve)
 	}
@@ -206,7 +206,7 @@ func ServeTLS(addr string, handler http.Handler, timeout time.Duration, opt *Soc
 		os.Exit(0)
 	})
 	if err != nil {
-		logPanic("graceful: ServeTLS failed: %v", err)
+		logFatal("graceful: ServeTLS failed: %v", err)
 	} else {
 		safeGo(func() {
 			svr.ServeTLS(certFile, keyFile)
