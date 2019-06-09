@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/temprory/log"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"testing"
@@ -40,8 +41,10 @@ func TestHttpServer(t *testing.T) {
 
 	router := gin.Default()
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
-	router.GET("/hello", func(c *gin.Context) {
+	router.Any("/hello", func(c *gin.Context) {
 		logInfo("onHello")
+		body, err := ioutil.ReadAll(c.Request.Body)
+		log.Println("body:", err, string(body))
 		c.String(http.StatusOK, "hello")
 	})
 
