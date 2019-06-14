@@ -137,6 +137,36 @@ func (svr *HttpServer) Shutdown() error {
 	return err
 }
 
+func (svr *HttpServer) SetSocketOpt(opt *SocketOpt) {
+	if opt != nil {
+		readTimeout := time.Second * 60
+		readHeaderTimeout := time.Second * 60
+		writeTimeout := time.Second * 10
+		maxHeaderBytes := 1 << 28
+		if opt.ReadTimeout > 0 {
+			readTimeout = opt.ReadTimeout
+		}
+		if opt.ReadHeaderTimeout > 0 {
+			readHeaderTimeout = opt.ReadHeaderTimeout
+		}
+		if opt.WriteTimeout > 0 {
+			writeTimeout = opt.WriteTimeout
+		}
+		maxHeaderBytes = opt.MaxHeaderBytes
+
+		l, ok := svr.listener.(*Listener)
+		if ok {
+
+			l.opt = opt
+		}
+
+		svr.server.ReadTimeout = readTimeout
+		svr.server.ReadHeaderTimeout = readHeaderTimeout
+		svr.server.WriteTimeout = writeTimeout
+		svr.server.MaxHeaderBytes = maxHeaderBytes
+	}
+}
+
 func NewHttpServer(addr string, handler http.Handler, to time.Duration, opt *SocketOpt, onTimeout func()) (*HttpServer, error) {
 	listener, err := NewListener(addr, opt)
 	if err != nil {
