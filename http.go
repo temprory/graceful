@@ -3,7 +3,10 @@ package graceful
 import (
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
+	rpprof "runtime/pprof"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -81,8 +84,34 @@ func NewListener(addr string, opt *SocketOpt) (net.Listener, error) {
 
 type HttpHandlerWrapper struct {
 	sync.WaitGroup
-	handler http.Handler
-	over    bool
+	handler      http.Handler
+	over         bool
+	pprofEnabled bool
+	pprofRoutes  map[string]func(w http.ResponseWriter, r *http.Request)
+}
+
+func (wrapper *HttpHandlerWrapper) EnablePProf(root string) {
+	if !strings.HasSuffix(root, "/") {
+		root += "/"
+	}
+	if wrapper.pprofRoutes == nil {
+		wrapper.pprofRoutes = map[string]func(w http.ResponseWriter, r *http.Request){}
+	}
+
+	wrapper.pprofEnabled = true
+
+	wrapper.pprofRoutes[root+"cmdline"] = pprof.Cmdline
+	wrapper.pprofRoutes[root+"profile"] = pprof.Profile
+	wrapper.pprofRoutes[root+"symbol"] = pprof.Symbol
+	wrapper.pprofRoutes[root+"trace"] = pprof.Trace
+	wrapper.pprofRoutes[root+"index"] = pprof.Index
+	for _, v := range rpprof.Profiles() {
+		wrapper.pprofRoutes[root+v.Name()] = pprof.Handler(v.Name()).ServeHTTP
+	}
+
+	for k, _ := range wrapper.pprofRoutes {
+		logInfo("--- pprof path: %v", k)
+	}
 }
 
 func (wrapper *HttpHandlerWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -91,6 +120,12 @@ func (wrapper *HttpHandlerWrapper) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	defer handlePanic()
 
 	if !wrapper.over {
+		if wrapper.pprofEnabled {
+			if h, ok := wrapper.pprofRoutes[r.URL.Path]; ok {
+				h(w, r)
+				return
+			}
+		}
 		wrapper.handler.ServeHTTP(w, r)
 	} else {
 		http.Error(w, http.StatusText(404), 404)
@@ -103,6 +138,11 @@ type HttpServer struct {
 	listener  net.Listener
 	server    *http.Server
 	onTimeout func()
+}
+
+func (svr *HttpServer) EnablePProf(root string) {
+	wraper, _ := svr.server.Handler.(*HttpHandlerWrapper)
+	wraper.EnablePProf(root)
 }
 
 func (svr *HttpServer) Serve() {
@@ -179,9 +219,9 @@ func NewHttpServer(addr string, handler http.Handler, to time.Duration, opt *Soc
 	}
 	wrapper.Add(1)
 
-	readTimeout := time.Second * 60
+	readTimeout := time.Second * 120
 	readHeaderTimeout := time.Second * 60
-	writeTimeout := time.Second * 10
+	writeTimeout := time.Second * 120 //pprof default min timeout 30
 	maxHeaderBytes := 1 << 28
 	if opt != nil {
 		if opt.ReadTimeout > 0 {
