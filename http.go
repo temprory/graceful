@@ -140,6 +140,10 @@ type HttpServer struct {
 	onTimeout func()
 }
 
+func (svr *HttpServer) Server() *http.Server {
+	return svr.server
+}
+
 func (svr *HttpServer) EnablePProf(root string) {
 	wraper, _ := svr.server.Handler.(*HttpHandlerWrapper)
 	wraper.EnablePProf(root)
